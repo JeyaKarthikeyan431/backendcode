@@ -489,6 +489,119 @@ public class LoginService {
 		return responseDto;
 	}
 
+	public ListResponse<List<UserDto>> getAllUsers(String userId) {
+
+		ListResponse<List<UserDto>> response = new ListResponse<List<UserDto>>();
+		List<UserDto> userDtoList = new ArrayList<>();
+		LoginDetails loginDtls = userRepo.getUserById(Integer.valueOf(userId));
+		if (ObjectUtils.isEmpty(loginDtls)) {
+			throw new ResourceNotFoundException(GatewayConstants.USER_NOT_FOUND);
+		}
+		if (loginDtls.getUserType().equalsIgnoreCase("A")) {
+			List<LoginDetails> users = userRepo.getAllUser();
+			users.forEach(user -> userDtoList.add(setUserDetailsDto(user)));
+			response.setData(userDtoList);
+			response.setMessage(GatewayConstants.AVAILABLE);
+			response.setStatus(HttpServletResponse.SC_OK);
+			response.setCount((long) (users != null ? users.size() : 0));
+		} else {
+			response.setMessage(GatewayConstants.USER_NEED_PRIVILEGE);
+			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+		}
+		return response;
+	}
+
+	public Response<UserDto> getUser(String userId) {
+
+		Response<UserDto> response = new Response<>();
+		UserDto userDto = new UserDto();
+		LoginDetails loginDtls = userRepo.getUserById(Integer.valueOf(userId));
+		if (ObjectUtils.isEmpty(loginDtls)) {
+			throw new ResourceNotFoundException(GatewayConstants.USER_NOT_FOUND);
+		}
+		userDto = setUserDetailsDto(loginDtls);
+		response.setData(userDto);
+		response.setMessage(GatewayConstants.AVAILABLE);
+		response.setStatus(HttpStatus.OK.value());
+		return response;
+	}
+
+	private UserDto setUserDetailsDto(LoginDetails loginDetails) {
+		UserDto userDto = new UserDto();
+		modelMapper.map(loginDetails, userDto);
+		if (StringUtils.isNotEmpty(loginDetails.getRole())) {
+			userDto.setRoleDesc(listOptionsRepo.findRoleDesc(loginDetails.getRole()));
+		}
+		if (StringUtils.isNotEmpty(loginDetails.getDepartment())) {
+			userDto.setDepartmentDesc(listOptionsRepo.findDepartmentDesc(loginDetails.getDepartment()));
+		}
+		return userDto;
+	}
+
+	public Response<String> updateUser(String userId, UserDto userDto) {
+
+		Response<String> responseDto = new Response<>();
+		LoginDetails adminUser = userRepo.getUserById(Integer.valueOf(userId));
+		LoginDetails userDtls = new LoginDetails();
+		userDtls = userRepo.getUserById(Integer.valueOf(userDto.getUserId()));
+		if (ObjectUtils.isEmpty(userDtls)) {
+			throw new ResourceNotFoundException(GatewayConstants.USER_NOT_FOUND);
+		} else {
+			if (!StringUtils.isEmpty(userDto.getFirstName())) {
+				userDtls.setFirstName(userDto.getFirstName());
+			}
+			if (!StringUtils.isEmpty(userDto.getLastName())) {
+				userDtls.setLastName(userDto.getLastName());
+			}
+			if (!StringUtils.isEmpty(userDto.getUserName())) {
+				userDtls.setUserName(userDto.getUserName());
+			}
+			if (!StringUtils.isEmpty(userDto.getEmailId())) {
+				userDtls.setEmailId(userDto.getEmailId());
+			}
+			if (!StringUtils.isEmpty(userDto.getMobileNo())) {
+				userDtls.setMobileNo(userDto.getMobileNo());
+			}
+			if (!StringUtils.isEmpty(userDto.getRole())) {
+				userDtls.setRole(userDto.getRole());
+			}
+			if (!StringUtils.isEmpty(userDto.getDepartment())) {
+				userDtls.setDepartment(userDto.getDepartment());
+			}
+			if (!StringUtils.isEmpty(userDto.getGroupId())) {
+				userDtls.setGroupId(userDto.getGroupId());
+			}
+			if (!StringUtils.isEmpty(userDto.getForcePwdChange())) {
+				userDtls.setForcePwdChange(userDto.getForcePwdChange());
+			}
+			if (!StringUtils.isEmpty(userDto.getUserType())) {
+				userDtls.setUserType(userDto.getUserType());
+			}
+			if (!StringUtils.isEmpty(userDto.getUserStatus())) {
+				userDtls.setUserStatus(userDto.getUserStatus());
+			}
+			userDtls.setUpdatedBy(adminUser.getUserName());
+			userDtls.setUpdatedDate(LocalDateTime.now());
+			userRepo.save(userDtls);
+			responseDto.setMessage(GatewayConstants.USER_UPDATED);
+			responseDto.setStatus(HttpStatus.OK.value());
+		}
+		return responseDto;
+	}
+
+	public Response<String> deleteUser(String userId) {
+
+		Response<String> response = new Response<>();
+		LoginDetails loginDtls = userRepo.getUserById(Integer.valueOf(userId));
+		if (ObjectUtils.isEmpty(loginDtls)) {
+			throw new ResourceNotFoundException(GatewayConstants.USER_NOT_FOUND);
+		}
+		userRepo.delete(loginDtls);
+		response.setMessage(GatewayConstants.USER_DELETED);
+		response.setStatus(HttpStatus.OK.value());
+		return response;
+	}
+
 	private String removeJunkChars(String s) {
 
 		Pattern p = Pattern.compile("[^A-Za-z0-9]");
@@ -550,6 +663,80 @@ public class LoginService {
 			response.setStatus(HttpStatus.NOT_FOUND.value());
 			response.setMessage(GatewayConstants.PASSWORD_GUIDELINES);
 		}
+		return response;
+	}
+
+	private List<String> getGuidelinesFromProfiling(LoginDetails userDetail, PasswordProfile passwordProfile) {
+
+		List<String> response = new ArrayList<>();
+		if (passwordProfile.getPwdLength() > 0 && passwordProfile.getPwdLength() != null
+				&& passwordProfile.getMaxLength() > 0 && passwordProfile.getMaxLength() != null) {
+			response.add("Your password must be between " + passwordProfile.getPwdLength() + " and "
+					+ passwordProfile.getMaxLength() + " characters.");
+		}
+		if (passwordProfile.getMinUCaseChars() != null && passwordProfile.getMinUCaseChars() > 0) {
+			response.add(
+					"Your password must contain at least " + passwordProfile.getMinUCaseChars() + " uppercase letter.");
+		}
+		if (passwordProfile.getMinLcaseChars() != null && passwordProfile.getMinLcaseChars() > 0) {
+			response.add(
+					"Your password must contain at least " + passwordProfile.getMinLcaseChars() + " lowercase letter.");
+		}
+		if (passwordProfile.getMinNumChars() != null && passwordProfile.getMinNumChars() > 0) {
+			response.add("Your password must contain at least " + passwordProfile.getMinNumChars() + " number digit.");
+		}
+		if (passwordProfile.getSpecialCharYN() != null && passwordProfile.getSpecialCharYN().equalsIgnoreCase("Y")
+				&& passwordProfile.getMinSplChars() != null && passwordProfile.getMinSplChars() > 0) {
+			response.add("Your password must contain at least " + passwordProfile.getMinSplChars()
+					+ " special character of set ( " + passwordProfile.getSplCharsAllowed() + " ).");
+		}
+		if (passwordProfile.getBlankSpaceAllowed() != null
+				&& passwordProfile.getBlankSpaceAllowed().equalsIgnoreCase("N")) {
+			response.add("Your password should not contain blank space.");
+		}
+		if (passwordProfile.getDictWordAllowed() != null
+				&& passwordProfile.getDictWordAllowed().equalsIgnoreCase("N")) {
+			response.add("Your password should not contain dictionary words like ( "
+					+ passwordProfile.getDictionaryWords() + " ).");
+		}
+		if (passwordProfile.getUserNameYN() != null && passwordProfile.getUserNameYN().equalsIgnoreCase("N")) {
+			response.add("Your password should not contain username.");
+		}
+		if (passwordProfile.getStartsWith() != null) {
+			if (passwordProfile.getStartsWith().equals("CH")) {
+				response.add("Your password should starts with character.");
+			} else if (passwordProfile.getStartsWith().equals("CN")) {
+				response.add("Your password should starts with character/number.");
+			}
+		}
+		if (passwordProfile.getEndsWith() != null) {
+			if (passwordProfile.getEndsWith().equals("CH")) {
+				response.add("Your password should ends with character.");
+			} else if (passwordProfile.getEndsWith().equals("CN")) {
+				response.add("Your password should ends with character/number.");
+			}
+		}
+		if (passwordProfile.getRepeatCharAllowed() != null
+				&& passwordProfile.getRepeatCharAllowed().equalsIgnoreCase("N")
+				&& passwordProfile.getNumNonRepatedNumAllowed() != null
+				&& passwordProfile.getNumNonRepatedNumAllowed() > 0) {
+			response.add("Your password should not contain more than " + passwordProfile.getNumNonRepatedNumAllowed()
+					+ " repeated characters.");
+		}
+		if (passwordProfile.getRepeatNumAllowed() != null && passwordProfile.getRepeatNumAllowed().equalsIgnoreCase("N")
+				&& passwordProfile.getNumNonRepatedNumAllowed() != null
+				&& passwordProfile.getNumNonRepatedNumAllowed() > 0) {
+			response.add("Your password should not contain more than " + passwordProfile.getNumNonRepatedNumAllowed()
+					+ " repeated numbers.");
+		}
+//		if (passwordProfile.getNumDaysLeftPwdExp() != null) {
+//			response.add("Your password validity is " + passwordProfile.getNumDaysLeftPwdExp() + " days.");
+//		}
+//		if (passwordProfile.getRepeatNumAllowed() != null && passwordProfile.getNumNonRepatedNumAllowed() != null
+//				&& passwordProfile.getNumNonRepatedNumAllowed() > 0) {
+//			response.add(
+//					"Reuse of the last " + passwordProfile.getNumNonRepatedNumAllowed() + " passwords not allowed.");
+//		}
 		return response;
 	}
 

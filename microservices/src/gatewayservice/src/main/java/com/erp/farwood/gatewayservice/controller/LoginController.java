@@ -58,9 +58,28 @@ public class LoginController {
 		return loginService.createUser(userId, userDto);
 	}
 
+	@GetMapping("/getUsers")
+	public ListResponse<List<UserDto>> getAllUsers(@RequestHeader String userId) {
+		return loginService.getAllUsers(userId);
+	}
+
+	@GetMapping("/getUser")
+	public @ResponseBody Response<UserDto> getUser(@RequestParam String userId) {
+		return loginService.getUser(userId);
+	}
+
+	@PutMapping("/updateUser")
+	public @ResponseBody Response<String> updateUser(@RequestParam String userId, @RequestBody UserDto userDto) {
+		return loginService.updateUser(userId, userDto);
+	}
+
 	@DeleteMapping("/deleteUser")
 	public @ResponseBody Response<String> deleteUser(@RequestParam String userId) {
 		return loginService.deleteUser(userId);
 	}
 
+	@GetMapping("/getPasswordGuidelines")
+	public @ResponseBody Response<List<String>> getPasswordGuidelines(@RequestHeader String userId) {
+		return loginService.getPasswordGuidelines(userId);
+	}
 }
